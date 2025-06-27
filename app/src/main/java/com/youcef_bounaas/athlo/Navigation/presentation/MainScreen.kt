@@ -49,11 +49,13 @@ fun MainScreen() {
             navController = navController,
 
 
-          //  startDestination = NavDestination.Record.route,
-             startDestination = NavDestination.Auth.route,
-           // startDestination = NavDestination.Home.route,
+            //  startDestination = NavDestination.Record.route,
+            startDestination = NavDestination.Auth.route,
+            // startDestination = NavDestination.Home.route,
 
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier.padding(paddingValues),
+            onSignOut = TODO(),
+            supabase = TODO()
         )
     }
 }

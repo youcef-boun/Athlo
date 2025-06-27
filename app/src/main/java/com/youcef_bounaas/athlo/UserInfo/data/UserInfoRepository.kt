@@ -14,19 +14,22 @@ class UserInfoRepository(
         firstName: String,
         lastName: String,
         birthday: String,
-        gender: String
+        gender: String,
+        avatar_url: String
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val userId = supabase.auth.currentUserOrNull()?.id
+            val user = supabase.auth.currentUserOrNull()
                 ?: return@withContext Result.failure(Exception("User not logged in"))
 
             val profile = Profile(
-              //  id = UUID.fromString(userId),
-                id = userId,
+
+                id = user.id,
+                email= user.email ?: "",
                 first_name = firstName,
                 last_name = lastName,
                 birthday = birthday,
-                gender = gender
+                gender = gender,
+                avatar_url = avatar_url
             )
 
             supabase.from("profiles").insert(profile)

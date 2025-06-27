@@ -149,22 +149,31 @@ dependencies {
 
 
 
-    //Supabase
-
+    // Supabase dependencies
     implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
-    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:auth-kt")  // This is the correct module name in 3.1.4
     implementation("io.github.jan-tennert.supabase:realtime-kt")
-    implementation("io.github.jan-tennert.supabase:gotrue-kt-android")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
 
 
-// Ktor for Android networking
+    // Ktor for Supabase (version 3.0.0-rc-1 as required)
+    implementation("io.ktor:ktor-client-okhttp:3.0.0-rc-1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.0-rc-1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0-rc-1")
+
+    // Google Play Services
     implementation("com.google.android.gms:play-services-location:21.0.1")
 
-    implementation("io.ktor:ktor-client-okhttp:3.0.0-rc-1")
+
+    implementation ("androidx.activity:activity-compose:1.8.1") // Or latest
+    implementation ("io.coil-kt:coil-compose:2.5.0") // For image preview
+    implementation ("androidx.core:core-ktx:1.13.0")
 
 
-    
+
+
+
 
 
 

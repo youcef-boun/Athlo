@@ -19,12 +19,15 @@ import com.youcef_bounaas.athlo.Home.presentation.UserInfoScreen
 import com.youcef_bounaas.athlo.Maps.presentation.MapsScreen
 import com.youcef_bounaas.athlo.Record.presentation.RecordScreen
 import com.youcef_bounaas.athlo.Record.presentation.StatsScreen
+import io.github.jan.supabase.SupabaseClient
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun AppNavigation(
     navController: NavHostController,
     startDestination: String,
+    onSignOut: () -> Unit = {},
+    supabase: SupabaseClient,
     modifier: Modifier = Modifier
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -87,7 +90,10 @@ fun AppNavigation(
             }
 
             composable(NavDestination.Home.route) {
-                HomeScreen()
+                HomeScreen(
+                    onSignOut = onSignOut,
+                    supabase = supabase
+                )
             }
 
             composable(NavDestination.Maps.route) {

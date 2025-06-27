@@ -253,7 +253,6 @@ fun RecordScreen() {
                             colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.primary),
                             elevation = ButtonDefaults.elevatedButtonElevation(5.dp),
                             contentPadding = PaddingValues(0.dp)
-                            //   interactionSource = TODO()
                         ){
                             Icon(
                                 imageVector = Icons.Filled.Square,
@@ -280,7 +279,6 @@ fun RecordScreen() {
                             colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.surface),
                             elevation = ButtonDefaults.elevatedButtonElevation(5.dp),
                             contentPadding = PaddingValues(0.dp)
-                            //   interactionSource = TODO()
                         ) {
                             Text(
                                 text = if (isRunning) "PAUSE" else "RESUME",
@@ -307,7 +305,6 @@ fun RecordScreen() {
                             colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.primary),
                             elevation = ButtonDefaults.elevatedButtonElevation(5.dp),
                             contentPadding = PaddingValues(0.dp)
-                            //   interactionSource = TODO()
                         ){
                             Text(
                                 text = "FINISH",
