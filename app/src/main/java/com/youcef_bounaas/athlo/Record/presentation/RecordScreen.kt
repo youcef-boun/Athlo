@@ -74,6 +74,13 @@ import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.locationcomponent.LocationConsumer
 import com.mapbox.common.location.*
 import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.graphicsLayer
+import com.mapbox.maps.Projection
+import com.mapbox.maps.extension.style.layers.properties.generated.ProjectionName
+import com.mapbox.maps.extension.style.projection.generated.setProjection
 
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -82,18 +89,23 @@ import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
 fun RecordScreen() {
     val viewModel: RecordViewModel = getViewModel()
 
-
-    val isRunning by viewModel.isRunning.collectAsState() // bool
-    val isFinished by viewModel.isFinished.collectAsState() // bool
-    val timeInSeconds = viewModel.timeInSeconds.collectAsState() // 0
-
-    val distance by viewModel.distance.collectAsState() // 0F
-    val avgPace by viewModel.avgPace.collectAsState() // 5:30
-
+    val isRunning by viewModel.isRunning.collectAsState()
+    val isFinished by viewModel.isFinished.collectAsState()
+    val timeInSeconds = viewModel.timeInSeconds.collectAsState()
+    val distance by viewModel.distance.collectAsState()
+    val avgPace by viewModel.avgPace.collectAsState()
+    var showFinishConfirmation by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
+    var isPanelVisible by remember { mutableStateOf(true) }
 
+    // Animation for sliding metrics panel
+    val panelTranslationY by animateFloatAsState(
+        targetValue = if (isPanelVisible) 0f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "panelSlide"
+    )
 
     // Timer effect
     LaunchedEffect(isRunning) {
@@ -119,8 +131,6 @@ fun RecordScreen() {
                     fontWeight = FontWeight.Medium
                 )
             },
-
-
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background
             )
@@ -132,20 +142,25 @@ fun RecordScreen() {
                 .fillMaxWidth()
                 .background(
                     if (isRunning) MaterialTheme.colorScheme.primary
-                    else Color(0xFFFF5722)
+                    else if (isFinished) { Color(0x00FF5722)
+                    }
+                    else Color(0xFFFF2222)
                 )
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = if (isRunning) "RUNNING" else "STOPPED",
+                text = if (isRunning) "RUNNING" else if (isFinished) {
+                    ""
+                } else
+                    "STOPPED",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
         }
 
-        // Map Area
+        // Map Area with overlay metrics panel
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -160,87 +175,93 @@ fun RecordScreen() {
                     }
                 )
         ) {
-            // Mock map content
+            // Fullscreen Map
             MapScreenWithPermissions()
 
-            // Map Controls
+            // Map Controls - always visible on the right side
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(16.dp),
+                    .padding(
+                        start = 16.dp,
+                        top = 16.dp,
+                        end = 16.dp,
+                        bottom = 110.dp // Increase this value to move controls higher above the metrics panel
+                    ),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MapControlButton(Icons.Default.Layers)
                 MapControlButton(Icons.Default.Rotate90DegreesCcw, "3D")
-                MapControlButton(Icons.Default.MyLocation){
+                MapControlButton(Icons.Default.MyLocation) {
                     viewModel.requestCenterOnUser()
                 }
                 MapControlButton(Icons.Default.Download)
             }
+
+            // Sliding Metrics Panel
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationY = size.height * panelTranslationY
+                    }
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                    .padding(20.dp)
+            ) {
+                Column {
+                    // Main Stats Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(
+                            label = "TIME",
+                            value = formatTime(timeInSeconds.value),
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatItem(
+                            label = "DISTANCE (km)",
+                            value = String.format("%.1f", distance),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Average Pace
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(
+                            label = "AVG PACE (/km)",
+                            value = avgPace,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
         }
 
-        // Stats Section
+        // Fixed Action Buttons Section (always visible at bottom)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(20.dp)
         ) {
-            // Main Stats Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    label = "TIME",
-                    value = formatTime(timeInSeconds.value),
-                    modifier = Modifier.weight(1f)
-                )
-                StatItem(
-                    label = "DISTANCE (km)",
-                    value = String.format("%.1f", distance),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-
-
-
-           // Average Pace
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    label = "AVG PACE (/km)",
-                    value = avgPace,
-                    modifier = Modifier.weight(1f)
-                )
-
-
-
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
             // Action Buttons Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 // Control Buttons
-
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-
                 ) {
-                    if(isFinished == true ) {
-
-
+                    if (isFinished == true) {
                         // Start Button
                         ElevatedButton(
                             onClick = {
@@ -253,21 +274,14 @@ fun RecordScreen() {
                             colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.primary),
                             elevation = ButtonDefaults.elevatedButtonElevation(5.dp),
                             contentPadding = PaddingValues(0.dp)
-                        ){
+                        ) {
                             Icon(
                                 imageVector = Icons.Filled.Square,
                                 contentDescription = "Location",
-                                tint =  Color.White
+                                tint = Color.White
                             )
                         }
-
-
-
-
-
-                    } else
-                    {
-
+                    } else {
                         // Resume/Pause Button
                         ElevatedButton(
                             onClick = {
@@ -291,49 +305,71 @@ fun RecordScreen() {
 
                         // Finish Button
                         ElevatedButton(
-                            onClick = {
-                              viewModel.finishRun()
-                                stopTrackingService(context)
-                                context.stopService(Intent(context, TrackingService::class.java))
-
-
-                                // Handle finish action
-                            },
+                            onClick = { showFinishConfirmation = true },
                             modifier = Modifier.size(90.dp),
                             enabled = true,
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.primary),
                             elevation = ButtonDefaults.elevatedButtonElevation(5.dp),
                             contentPadding = PaddingValues(0.dp)
-                        ){
+                        ) {
                             Text(
                                 text = "FINISH",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,
+                            )
+                        }
 
-                                )
+                        if (showFinishConfirmation) {
+                            AlertDialog(
+                                onDismissRequest = { showFinishConfirmation = false },
+                                title = { Text("Confirm Finish") },
+                                text = { Text("Are you sure you want to finish your run?") },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showFinishConfirmation = false
+                                            viewModel.finishRun()
+                                            stopTrackingService(context)
+                                            context.stopService(Intent(context, TrackingService::class.java))
+                                        }
+                                    ) {
+                                        Text("Yes")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showFinishConfirmation = false }) {
+                                        Text("Cancel")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
 
-Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(12.dp))
 
-                // Location Button
+                // Location Button - toggles metrics panel visibility
                 ElevatedButton(
-                    onClick = { },
+                    onClick = {
+                        isPanelVisible = !isPanelVisible
+                    },
                     modifier = Modifier.size(48.dp),
                     shape = CircleShape,
                     contentPadding = PaddingValues(0.dp),
                     colors = ButtonDefaults.elevatedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = if (isPanelVisible)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.LocationOn,
                         contentDescription = "Location",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (isPanelVisible) Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -373,7 +409,6 @@ private fun MapControlButton(
     }
 }
 
-
 @Composable
 private fun StatItem(
     label: String,
@@ -400,21 +435,11 @@ private fun StatItem(
     }
 }
 
-
-
 private fun formatTime(seconds: Int): String {
     val minutes = seconds / 60
     val remainingSeconds = seconds % 60
     return String.format("%d:%02d", minutes, remainingSeconds)
 }
-
-
-
-
-
-
-
-
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
@@ -434,11 +459,11 @@ fun MapScreen() {
     val hasZoomedOnStart by viewModel.hasZoomedOnStart.collectAsState()
 
     var lastKnownLocation by remember { mutableStateOf<Point?>(null) }
-
-
-
-
     var wasCameraMovedByUser by remember { mutableStateOf(false) }
+
+    val isDarkTheme = isSystemInDarkTheme()
+    val nightStyleUri = "mapbox://styles/mapbox/navigation-night-v1"
+    val mapStyle = if (isDarkTheme) nightStyleUri else Style.MAPBOX_STREETS
 
     LaunchedEffect(Unit) {
         mapViewRef?.gestures?.addOnMoveListener(object : OnMoveListener {
@@ -451,14 +476,6 @@ fun MapScreen() {
         })
     }
 
-
-
-
-
-
-
-
-
     AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
@@ -470,7 +487,13 @@ fun MapScreen() {
                 val provider = DefaultLocationProvider(context)
                 location.setLocationProvider(provider)
 
-                mapboxMap.loadStyleUri(Style.MAPBOX_STREETS) { style ->
+                mapboxMap.loadStyleUri(mapStyle) { style ->
+
+                    mapboxMap.setProjection(
+                        com.mapbox.maps.extension.style.projection.generated.Projection(
+                            ProjectionName.MERCATOR
+                        )
+                    )
                     // 📍 Show user puck
                     location.updateSettings {
                         enabled = true
@@ -516,17 +539,12 @@ fun MapScreen() {
                             viewModel.markZoomed()
                         }
 
-
                         //foreground tracking
                         /*
-
                         if (trackingState == TrackingState.TRACKING) {
                             viewModel.addPoint(point)
                         }
-
                          */
-
-
                     }
                 }
             }
@@ -535,14 +553,6 @@ fun MapScreen() {
             mapViewRef = it
         }
     )
-
-
-
-
-
-
-
-
 
     // ✅ Re-draw path on pathSegments change
     LaunchedEffect(pathSegments) {
@@ -580,10 +590,6 @@ fun MapScreen() {
         }
     }
 
-
-
-
-
     LaunchedEffect(trackingState) {
         if (trackingState == TrackingState.FINISHED) {
             val allPoints = pathSegments.flatten()
@@ -609,7 +615,6 @@ fun MapScreen() {
         }
     }
 
-
     //center button
     LaunchedEffect(Unit) {
         viewModel.centerOnUser.collect {
@@ -626,33 +631,7 @@ fun MapScreen() {
             }
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @Composable
 fun RequestLocationPermission(
@@ -692,15 +671,12 @@ fun MapScreenWithPermissions() {
             onPermissionGranted = { permissionGranted = true },
             onPermissionDenied = {
                 // Optionally show a UI saying permission is needed
-
-
             }
         )
     } else {
         MapScreen()
     }
 }
-
 
 fun calculateBounds(points: List<Point>): CoordinateBounds? {
     if (points.isEmpty()) return null
@@ -724,9 +700,6 @@ fun calculateBounds(points: List<Point>): CoordinateBounds? {
     return CoordinateBounds(southwest, northeast)
 }
 
-
-
-
 private fun startTrackingService(context: Context) {
     val intent = Intent(context, TrackingService::class.java)
     context.startService(intent)
@@ -736,24 +709,3 @@ private fun stopTrackingService(context: Context) {
     val intent = Intent(context, TrackingService::class.java)
     context.stopService(intent)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
