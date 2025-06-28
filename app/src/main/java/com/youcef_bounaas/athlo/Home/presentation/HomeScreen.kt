@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
@@ -52,10 +54,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import io.github.jan.supabase.storage.Storage
+import io.github.jan.supabase.storage.storage
 
 import kotlinx.coroutines.withContext
 import java.io.IOException
-
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,7 +70,6 @@ fun HomeScreen(
     onSignOut: () -> Unit,
     supabase: SupabaseClient
 ) {
-
     val isDarkTheme = isSystemInDarkTheme()
     val backgroundColor = if (isDarkTheme) Color(0xFF1A1A1A) else Color(0xFFF8F9FA)
     val surfaceColor = if (isDarkTheme) Color(0xFF2D2D2D) else Color.White
@@ -73,59 +78,40 @@ fun HomeScreen(
     val primaryColor = MaterialTheme.colorScheme.primary
     val borderColor = if (isDarkTheme) Color(0xFF404040) else Color(0xFFE8E8E8)
 
-
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var birthday by remember { mutableStateOf("") }
     var gender by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
 
-
-
-
-
-
     val coroutineScope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf<Profile?>(null) }
-
     val context = LocalContext.current
     val imageUri = remember { mutableStateOf<Uri?>(null) }
+    var avatarUrl by remember { mutableStateOf<String?>(null) }
 
-    val launcher = rememberLauncherForActivityResult(
+    val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        imageUri.value = uri
+        if (uri != null) imageUri.value = uri
     }
 
-
     LaunchedEffect(Unit) {
-
         coroutineScope.launch {
             try {
                 val userId = supabase.auth.currentUserOrNull()?.id
                 if (userId != null) {
                     val result = supabase.from("profiles")
                         .select {
-                            filter{
-                                eq(
-                                    "id", userId
-                                )
-                            }
+                            filter { eq("id", userId) }
                         }
-
-
-
                         .decodeSingle<Profile>()
 
-                    profile = result
                     firstName = result.first_name
                     lastName = result.last_name
                     birthday = result.birthday
                     gender = result.gender
                     email = result.email
-
-
-                    profile = result
+                    avatarUrl = result.avatar_url
                 }
             } catch (e: Exception) {
                 Log.e("Supabase", "Error loading profile: ${e.message}")
@@ -133,6 +119,10 @@ fun HomeScreen(
         }
     }
 
+    fun uriToByteArray(context: Context, uri: Uri): ByteArray {
+        return context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: throw IllegalArgumentException("Unable to read URI")
+    }
 
     Column(
         modifier = Modifier
@@ -140,15 +130,14 @@ fun HomeScreen(
             .background(backgroundColor)
             .verticalScroll(rememberScrollState())
     ) {
-        // Top Bar with icons like in the screenshots
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { /* Handle back navigation */ }) {
+            IconButton(onClick = { }) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Back",
@@ -156,290 +145,154 @@ fun HomeScreen(
                     modifier = Modifier.size(24.dp)
                 )
             }
-
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-
-                IconButton(onClick = {
-                    coroutineScope.launch {
-                        try {
-                            val userId = supabase.auth.currentUserOrNull()?.id ?: return@launch
-
-                            supabase.from("profiles").update(
-                                mapOf(
-                                    "first_name" to firstName,
-                                    "last_name" to lastName,
-                                    "birthday" to birthday,
-                                    "gender" to gender,
-                                    "email" to email
-                                )
-                            ){
-                                filter {
-                                    eq("id", userId)
-                                }
+            IconButton(onClick = {
+                coroutineScope.launch {
+                    try {
+                        val userId = supabase.auth.currentUserOrNull()?.id ?: return@launch
+                        imageUri.value?.let { uri ->
+                            val bytes = uriToByteArray(context, uri)
+                            val path = "$userId.jpg"
+                            supabase.storage.from("avatars").upload(path, bytes) {
+                                upsert = true
                             }
-
-                            Toast.makeText(
-                                context,
-                                "Profile updated successfully",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } catch (e: Exception) {
-                            Log.e("Supabase", "Update failed: ${e.message}")
-                            Toast.makeText(
-                                context,
-                                "Update failed: ${e.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            avatarUrl = supabase.storage.from("avatars").publicUrl(path)
                         }
+
+                        supabase.from("profiles").update(
+                            mapOf(
+                                "first_name" to firstName,
+                                "last_name" to lastName,
+                                "birthday" to birthday,
+                                "gender" to gender,
+                                "email" to email,
+                                "avatar_url" to avatarUrl
+                            )
+                        ) {
+                            filter { eq("id", userId) }
+                        }
+
+                        Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Log.e("Supabase", "Error: ${e.message}")
+                        Toast.makeText(context, "Update failed", Toast.LENGTH_LONG).show()
                     }
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Save,
-                        contentDescription = "Save",
-                        tint = onSurfaceColor,
-                        modifier = Modifier.size(24.dp)
-                    )
                 }
+            }) {
+                Icon(Icons.Default.Save, contentDescription = null, tint = onSurfaceColor)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Profile Section
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-        ) {
-            // Avatar with border like in screenshots
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
                     .border(3.dp, primaryColor, CircleShape)
-                    .padding(3.dp),
+                    .clickable { imagePickerLauncher.launch("image/*") },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(Color(0xFFFFDBE0))
-                ) {
-                    // Avatar content would go here
-                    imageUri.value?.let { uri ->
-                        Image(
-                            painter = rememberAsyncImagePainter(model = uri),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                        )
+                val painter = rememberAsyncImagePainter(imageUri.value ?: avatarUrl)
+                if (imageUri.value != null || avatarUrl != null) {
+                    Image(
+                        painter = painter,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFDBE0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
                     }
-
                 }
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-
-            Text(
-                text = "${profile?.first_name ?: ""} ${profile?.last_name ?: ""}".trim(),
-                color = onSurfaceColor,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action buttons similar to screenshots
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { launcher.launch("image/*") },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = primaryColor
-                    ),
-                    border = BorderStroke(1.dp, primaryColor),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text(
-                        text = "CHANGE AVATAR",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
+            Text("$firstName $lastName", color = onSurfaceColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Form Fields in card-like containers
-        Column(
-            modifier = Modifier.padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Profile fields in clean cards
-            ProfileCard(
-                isDarkTheme = isDarkTheme,
-                surfaceColor = surfaceColor,
-                borderColor = borderColor
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
-                ) {
-                    ProfileTextField(
-                        label = "First Name",
-                        value =  firstName,
-                        onValueChange = {firstName = it },
-                        isDarkTheme = isDarkTheme,
-                        onSurfaceColor = onSurfaceColor,
-                        onSurfaceVariant = onSurfaceVariant
-                    )
-
-                    ProfileTextField(
-                        label = "Last Name",
-                        value = lastName,
-                        onValueChange = { lastName = it  },
-                        isDarkTheme = isDarkTheme,
-                        onSurfaceColor = onSurfaceColor,
-                        onSurfaceVariant = onSurfaceVariant
-                    )
+        Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            ProfileCard(isDarkTheme, surfaceColor, borderColor) {
+                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    ProfileTextField("First Name", firstName, { firstName = it }, false, null, isDarkTheme, onSurfaceColor, onSurfaceVariant)
+                    ProfileTextField("Last Name", lastName, { lastName = it }, false, null, isDarkTheme, onSurfaceColor, onSurfaceVariant)
 
                     val datePickerState = rememberDatePickerState()
-                    var showDatePicker by remember { mutableStateOf(false) }
-
-                    if (showDatePicker) {
+                    var showPicker by remember { mutableStateOf(false) }
+                    if (showPicker) {
                         DatePickerDialog(
-                            onDismissRequest = { showDatePicker = false },
+                            onDismissRequest = { showPicker = false },
                             confirmButton = {
                                 TextButton(onClick = {
-                                    showDatePicker = false
-                                    val selectedDate = datePickerState.selectedDateMillis?.let {
-                                        java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date(it))
+                                    showPicker = false
+                                    datePickerState.selectedDateMillis?.let {
+                                        birthday = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(
+                                            Date(it)
+                                        )
                                     }
-                                    if (selectedDate != null) {
-                                        birthday = selectedDate
-                                    }
-                                }) {
-                                    Text("OK")
-                                }
+                                }) { Text("OK") }
                             },
-                            dismissButton = {
-                                TextButton(onClick = { showDatePicker = false }) {
-                                    Text("Cancel")
-                                }
-                            }
-                        ) {
-                            DatePicker(state = datePickerState)
-                        }
+                            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } }
+                        ) { DatePicker(state = datePickerState) }
                     }
-
-                    ProfileTextField(
-                        label = "Birthday",
-                        value = birthday,
-                        onValueChange = { },
-                        isDarkTheme = isDarkTheme,
-                        onSurfaceColor = onSurfaceColor,
-                        onSurfaceVariant = onSurfaceVariant,
-                        readOnly = true,
-                        trailingIcon = {
-                            IconButton(onClick = { showDatePicker = true }) {
-                                Icon(Icons.Default.DateRange, contentDescription = "Select date")
-                            }
+                    ProfileTextField("Birthday", birthday, {}, true, {
+                        IconButton(onClick = { showPicker = true }) {
+                            Icon(Icons.Default.DateRange, contentDescription = null)
                         }
-                    )
+                    }, isDarkTheme, onSurfaceColor, onSurfaceVariant)
 
                     var expanded by remember { mutableStateOf(false) }
                     val genderOptions = listOf("Male", "Female")
-
-                    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-                        ProfileTextField(
-                            label = "Gender",
-                            value = gender,
-                            onValueChange = {},
-                            isDarkTheme = isDarkTheme,
-                            onSurfaceColor = onSurfaceColor,
-                            onSurfaceVariant = onSurfaceVariant,
-                            readOnly = true,
-                            modifier = Modifier.menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            genderOptions.forEach { selectionOption ->
-                                DropdownMenuItem(
-                                    text = { Text(selectionOption) },
-                                    onClick = {
-                                        gender = selectionOption
-                                        expanded = false
-                                    }
-                                )
+                    ExposedDropdownMenuBox(expanded, onExpandedChange = { expanded = !expanded }) {
+                        ProfileTextField("Gender", gender, {}, true, null, isDarkTheme, onSurfaceColor, onSurfaceVariant, Modifier.menuAnchor())
+                        ExposedDropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+                            genderOptions.forEach {
+                                DropdownMenuItem({ Text(it) }, onClick = {
+                                    gender = it
+                                    expanded = false
+                                })
                             }
                         }
                     }
 
-                    ProfileTextField(
-                        label = "Email",
-                        value = email,
-                        onValueChange = {},
-                        isDarkTheme = isDarkTheme,
-                        onSurfaceColor = onSurfaceColor,
-                        onSurfaceVariant = onSurfaceVariant,
-                        readOnly = true
-                    )
-
-
-
+                    ProfileTextField("Email", email, {}, true, null, isDarkTheme, onSurfaceColor, onSurfaceVariant)
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Sign Out Button with proper styling
         Button(
             onClick = {
                 CoroutineScope(Dispatchers.Main).launch {
                     try {
                         supabase.auth.signOut()
                         onSignOut()
-                    } catch (e: Exception) {
-                        // Handle any errors during sign out
-                        onSignOut() // Still navigate to auth screen even if sign out fails
+                    } catch (_: Exception) {
+                        onSignOut()
                     }
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent
-            ),
-            shape = RoundedCornerShape(8.dp),
+                .padding(horizontal = 24.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
             border = BorderStroke(1.dp, primaryColor)
         ) {
-            Text(
-                text = "Sign Out",
-                color = primaryColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.5.sp
-            )
+            Text("Sign Out", color = primaryColor)
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
+
 
 @Composable
 fun ProfileCard(
@@ -522,13 +375,7 @@ fun ProfileTextField(
 
     }
 
-    suspend fun uriToByteArray(context: Context, uri: Uri): ByteArray {
-        return withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
-            } ?: throw IOException("Unable to read image")
-        }
-    }
+
 
 }
 
