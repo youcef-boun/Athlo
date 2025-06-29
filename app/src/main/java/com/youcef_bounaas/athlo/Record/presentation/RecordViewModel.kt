@@ -7,7 +7,10 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import com.mapbox.geojson.Point
 import androidx.lifecycle.AndroidViewModel
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.viewModelScope
+import com.mapbox.maps.CameraOptions
 import com.youcef_bounaas.athlo.Record.data.LocationBroadcaster
 import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
 import com.youcef_bounaas.athlo.Record.utils.calculateTotalDistanceInKm
@@ -24,7 +27,10 @@ import kotlinx.coroutines.launch
 enum class TrackingState { IDLE, TRACKING, PAUSED, FINISHED }
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-class RecordViewModel(application: Application) : AndroidViewModel(application) {
+class RecordViewModel(
+    application: Application,
+    private val savedStateHandle: androidx.lifecycle.SavedStateHandle
+) : AndroidViewModel(application) {
 
 
     private val _centerOnUser = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -58,19 +64,104 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
     private val _avgPace = MutableStateFlow("-:--") // static for now
     val avgPace = _avgPace.asStateFlow()
 
-    private val _hasZoomedOnStart = MutableStateFlow(false)
+    private val _hasZoomedOnStart = MutableStateFlow(savedStateHandle.get<Boolean>(HAS_ZOOMED_ON_START) ?: false)
     val hasZoomedOnStart = _hasZoomedOnStart.asStateFlow()
 
 
-    private val _initialCameraMoved = MutableStateFlow(false)
+    private val _initialCameraMoved = MutableStateFlow(savedStateHandle.get<Boolean>(INITIAL_CAMERA_MOVED) ?: false)
     val initialCameraMoved: StateFlow<Boolean> = _initialCameraMoved
 
 
+    private val _lastCameraPosition = MutableStateFlow<CameraOptions?>(null)
+    val lastCameraPosition: StateFlow<CameraOptions?> = _lastCameraPosition.asStateFlow()
 
 
 
+    private val _runStartTimeMillis = MutableStateFlow(savedStateHandle.get<Long>(RUN_START_TIME))
+    val runStartTimeMillis: StateFlow<Long?> = _runStartTimeMillis.asStateFlow()
 
 
+
+    companion object {
+        var latestInstance: RecordViewModel? = null
+        private const val RUN_START_TIME = "run_start_time"
+        private const val CAMERA_CENTER_LNG = "camera_center_lng"
+        private const val CAMERA_CENTER_LAT = "camera_center_lat"
+        private const val CAMERA_ZOOM = "camera_zoom"
+        private const val CAMERA_BEARING = "camera_bearing"
+        private const val CAMERA_PITCH = "camera_pitch"
+        private const val INITIAL_CAMERA_MOVED = "initial_camera_moved"
+        private const val HAS_ZOOMED_ON_START = "has_zoomed_on_start"
+    }
+
+    fun saveCameraPosition(cameraOptions: CameraOptions) {
+        _lastCameraPosition.value = cameraOptions
+        cameraOptions.center?.let {
+            savedStateHandle[CAMERA_CENTER_LNG] = it.longitude()
+            savedStateHandle[CAMERA_CENTER_LAT] = it.latitude()
+        }
+        cameraOptions.zoom?.let { savedStateHandle[CAMERA_ZOOM] = it }
+        cameraOptions.bearing?.let { savedStateHandle[CAMERA_BEARING] = it }
+        cameraOptions.pitch?.let { savedStateHandle[CAMERA_PITCH] = it }
+        // Save to SharedPreferences as well
+        saveCameraToPrefs(cameraOptions)
+        Log.d("RecordViewModel", "Saving camera: center=${cameraOptions.center}, zoom=${cameraOptions.zoom}, bearing=${cameraOptions.bearing}, pitch=${cameraOptions.pitch}")
+    }
+
+    private fun saveCameraToPrefs(cameraOptions: CameraOptions) {
+
+        val prefs = getApplication<Application>().getSharedPreferences("map_camera_prefs", Context.MODE_PRIVATE)
+        with(prefs.edit()) {
+            cameraOptions.center?.let {
+                putLong(CAMERA_CENTER_LNG, java.lang.Double.doubleToRawLongBits(it.longitude()))
+                putLong(CAMERA_CENTER_LAT, java.lang.Double.doubleToRawLongBits(it.latitude()))
+            }
+            cameraOptions.zoom?.let { putLong(CAMERA_ZOOM, java.lang.Double.doubleToRawLongBits(it)) }
+            cameraOptions.bearing?.let { putLong(CAMERA_BEARING, java.lang.Double.doubleToRawLongBits(it)) }
+            cameraOptions.pitch?.let { putLong(CAMERA_PITCH, java.lang.Double.doubleToRawLongBits(it)) }
+            apply()
+        }
+    }
+
+    fun getSavedCameraOptions(): CameraOptions? {
+        val lng = savedStateHandle.get<Double>(CAMERA_CENTER_LNG)
+        val lat = savedStateHandle.get<Double>(CAMERA_CENTER_LAT)
+        val zoom = savedStateHandle.get<Double>(CAMERA_ZOOM)
+        val bearing = savedStateHandle.get<Double>(CAMERA_BEARING)
+        val pitch = savedStateHandle.get<Double>(CAMERA_PITCH)
+        if (lng != null && lat != null && zoom != null) {
+            return CameraOptions.Builder()
+                .center(Point.fromLngLat(lng, lat))
+                .zoom(zoom)
+                .bearing(bearing ?: 0.0)
+                .pitch(pitch ?: 0.0)
+                .build()
+        } else {
+            // Fallback to SharedPreferences
+            val prefs = getApplication<Application>().getSharedPreferences("map_camera_prefs", Context.MODE_PRIVATE)
+            val lngBits = prefs.getLong(CAMERA_CENTER_LNG, java.lang.Double.doubleToRawLongBits(0.0))
+            val latBits = prefs.getLong(CAMERA_CENTER_LAT, java.lang.Double.doubleToRawLongBits(0.0))
+            val zoomBits = prefs.getLong(CAMERA_ZOOM, java.lang.Double.doubleToRawLongBits(0.0))
+            val bearingBits = prefs.getLong(CAMERA_BEARING, java.lang.Double.doubleToRawLongBits(0.0))
+            val pitchBits = prefs.getLong(CAMERA_PITCH, java.lang.Double.doubleToRawLongBits(0.0))
+            val lngPref = java.lang.Double.longBitsToDouble(lngBits)
+            val latPref = java.lang.Double.longBitsToDouble(latBits)
+            val zoomPref = java.lang.Double.longBitsToDouble(zoomBits)
+            val bearingPref = java.lang.Double.longBitsToDouble(bearingBits)
+            val pitchPref = java.lang.Double.longBitsToDouble(pitchBits)
+            // Only restore if zoomPref is not 0 (never saved)
+            return if (zoomPref != 0.0) {
+                CameraOptions.Builder()
+                    .center(Point.fromLngLat(lngPref, latPref))
+                    .zoom(zoomPref)
+                    .bearing(bearingPref)
+                    .pitch(pitchPref)
+                    .build()
+            } else null
+        }
+
+
+    }
 
 
 
@@ -80,9 +171,6 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
 
     fun incrementTime() {
         _timeInSeconds.value +=1
-
-
-
 
     }
 
@@ -96,6 +184,8 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
         _trackingState.value = TrackingState.TRACKING
         resetZoomFlag()
         resetInitialCameraMoved()
+        _runStartTimeMillis.value = System.currentTimeMillis()
+        savedStateHandle[RUN_START_TIME] = _runStartTimeMillis.value
     }
 
     fun pauseOrResumeRun() {
@@ -167,10 +257,12 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
 
     fun markZoomed() {
         _hasZoomedOnStart.value = true
+        savedStateHandle[HAS_ZOOMED_ON_START] = true
     }
 
     fun resetZoomFlag() {
         _hasZoomedOnStart.value = false
+        savedStateHandle[HAS_ZOOMED_ON_START] = false
     }
 
 
@@ -179,10 +271,12 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
 
     fun markInitialCameraMoved() {
         _initialCameraMoved.value = true
+        savedStateHandle[INITIAL_CAMERA_MOVED] = true
     }
 
     fun resetInitialCameraMoved() {
         _initialCameraMoved.value = false
+        savedStateHandle[INITIAL_CAMERA_MOVED] = false
     }
 
     fun requestCenterOnUser() {
@@ -194,12 +288,16 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
 
 
 
+/*
     companion object {
         var latestInstance: RecordViewModel? = null
     }
 
+ */
+
 
     init {
+        Log.d("RecordViewModel", "RecordViewModel created! " + this.hashCode())
         latestInstance = this
     }
 
@@ -242,16 +340,4 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
     }
 
 
-
-
-
-    /*
-        fun clearPath() {
-            _pathPoints.value = emptyList()
         }
-
-     */
-
-
-
-}

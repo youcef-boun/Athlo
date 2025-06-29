@@ -5,7 +5,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -62,7 +61,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import com.mapbox.android.gestures.MoveGestureDetector
-import com.mapbox.common.location.Location
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CoordinateBounds
 import com.mapbox.maps.EdgeInsets
@@ -71,16 +69,14 @@ import com.mapbox.maps.plugin.animation.flyTo
 import com.mapbox.maps.plugin.annotation.generated.PolylineAnnotationManager
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.maps.plugin.gestures.gestures
-import com.mapbox.maps.plugin.locationcomponent.LocationConsumer
-import com.mapbox.common.location.*
 import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.graphicsLayer
-import com.mapbox.maps.Projection
 import com.mapbox.maps.extension.style.layers.properties.generated.ProjectionName
 import com.mapbox.maps.extension.style.projection.generated.setProjection
+import com.mapbox.maps.extension.style.projection.generated.Projection
 
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -488,12 +484,18 @@ fun MapScreen() {
                 location.setLocationProvider(provider)
 
                 mapboxMap.loadStyleUri(mapStyle) { style ->
+                    val savedCamera = viewModel.getSavedCameraOptions()
+                    if (savedCamera != null) {
+                        mapboxMap.setCamera(savedCamera)
+                        viewModel.markInitialCameraMoved() // Prevent flyTo from overriding restored position
+                    }
 
                     mapboxMap.setProjection(
-                        com.mapbox.maps.extension.style.projection.generated.Projection(
+                        Projection(
                             ProjectionName.MERCATOR
                         )
                     )
+
                     // 📍 Show user puck
                     location.updateSettings {
                         enabled = true
@@ -539,12 +541,7 @@ fun MapScreen() {
                             viewModel.markZoomed()
                         }
 
-                        //foreground tracking
-                        /*
-                        if (trackingState == TrackingState.TRACKING) {
-                            viewModel.addPoint(point)
-                        }
-                         */
+
                     }
                 }
             }
@@ -553,6 +550,22 @@ fun MapScreen() {
             mapViewRef = it
         }
     )
+
+    LaunchedEffect(mapViewRef) {
+        mapViewRef?.getMapboxMap()?.addOnCameraChangeListener {
+            val cameraState = mapViewRef?.getMapboxMap()?.cameraState
+            if (cameraState != null) {
+                viewModel.saveCameraPosition(
+                    CameraOptions.Builder()
+                        .center(cameraState.center)
+                        .zoom(cameraState.zoom)
+                        .bearing(cameraState.bearing)
+                        .pitch(cameraState.pitch)
+                        .build()
+                )
+            }
+        }
+    }
 
     // ✅ Re-draw path on pathSegments change
     LaunchedEffect(pathSegments) {
