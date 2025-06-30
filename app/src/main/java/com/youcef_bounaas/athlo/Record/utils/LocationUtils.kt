@@ -1,6 +1,7 @@
 package com.youcef_bounaas.athlo.Record.utils
 
 import com.mapbox.geojson.Point
+import com.youcef_bounaas.athlo.Stats.data.TrackPoint
 import kotlin.math.*
 
 fun haversineDistance(p1: Point, p2: Point): Double {
@@ -20,12 +21,12 @@ fun haversineDistance(p1: Point, p2: Point): Double {
     return R * c // distance in meters
 }
 
-fun calculateTotalDistanceInKm(segments: List<List<Point>>): Float {
+fun calculateTotalDistanceInKm(segments: List<List<TrackPoint>>): Float {
     var total = 0.0
     segments.forEach { segment ->
         for (i in 0 until segment.size - 1) {
-            total += haversineDistance(segment[i], segment[i + 1])
+            total += haversineDistance(segment[i].point, segment[i + 1].point)
         }
     }
-    return (total / 1000).toFloat() // meters → km
+    return (total / 1000).toFloat()
 }

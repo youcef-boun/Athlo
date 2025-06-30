@@ -15,6 +15,9 @@ import com.youcef_bounaas.athlo.Record.data.LocationBroadcaster
 import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
 import com.youcef_bounaas.athlo.Record.utils.calculateTotalDistanceInKm
 import com.youcef_bounaas.athlo.Record.utils.haversineDistance
+import com.youcef_bounaas.athlo.Stats.data.Run
+import com.youcef_bounaas.athlo.Stats.data.TrackPoint
+import com.youcef_bounaas.athlo.Stats.utils.generateGpx
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -22,6 +25,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.storage.storage
+import java.time.Instant
 
 
 enum class TrackingState { IDLE, TRACKING, PAUSED, FINISHED }
@@ -37,10 +45,14 @@ class RecordViewModel(
     val centerOnUser: SharedFlow<Unit> = _centerOnUser
 
 
-
+/*
     private val _pathSegments = MutableStateFlow<List<List<Point>>>(emptyList())
     val pathSegments: StateFlow<List<List<Point>>> = _pathSegments.asStateFlow()
 
+ */
+
+    private val _pathSegments = MutableStateFlow<List<List<TrackPoint>>>(emptyList())
+    val pathSegments: StateFlow<List<List<TrackPoint>>> = _pathSegments.asStateFlow()
 
     private val _trackingState = MutableStateFlow(TrackingState.IDLE)
     val trackingState: StateFlow<TrackingState> = _trackingState.asStateFlow()
@@ -229,14 +241,16 @@ class RecordViewModel(
 
     fun addPoint(point: Point) {
         if (_isRunning.value) {
-            val last = pathSegments.value.lastOrNull()?.lastOrNull()
+            val now = System.currentTimeMillis()
+            val last = pathSegments.value.lastOrNull()?.lastOrNull()?.point
             if (last == null || haversineDistance(last, point) > 5.0) {
                 _pathSegments.update { segments ->
                     val copy = segments.toMutableList()
-                    if (copy.isEmpty()) copy.add(mutableListOf(point))
+                    val trackPoint = TrackPoint(point, now)
+                    if (copy.isEmpty()) copy.add(mutableListOf(trackPoint))
                     else {
                         val lastSegment = copy.removeLast().toMutableList()
-                        lastSegment.add(point)
+                        lastSegment.add(trackPoint)
                         copy.add(lastSegment)
                     }
                     copy
@@ -288,13 +302,6 @@ class RecordViewModel(
 
 
 
-/*
-    companion object {
-        var latestInstance: RecordViewModel? = null
-    }
-
- */
-
 
     init {
         Log.d("RecordViewModel", "RecordViewModel created! " + this.hashCode())
@@ -337,6 +344,73 @@ class RecordViewModel(
         val minutes = paceInSecondsPerKm / 60
         val seconds = paceInSecondsPerKm % 60
         return String.format("%d:%02d", minutes, seconds)
+    }
+
+    fun exportCurrentRunToGpx(): String? {
+        val segments = pathSegments.value
+        val startMillis = runStartTimeMillis.value
+        val dist = distance.value
+        val duration = timeInSeconds.value
+        val pace = avgPace.value
+
+        if (segments.isEmpty() || startMillis == null) return null
+
+        return generateGpx(
+            pathSegments = segments,
+            runStartTimeMillis = startMillis,
+            distanceKm = dist,
+            durationSec = duration,
+            avgPace = pace
+        )
+    }
+
+
+
+
+
+    suspend fun uploadGpxToSupabase(
+        supabaseClient: SupabaseClient,
+        gpxString: String,
+        userId: String
+    ): String? {
+        val gpxBytes = gpxString.toByteArray(Charsets.UTF_8)
+        val fileName = "run_${System.currentTimeMillis()}.gpx"
+        val objectPath = "user_${userId}/$fileName"
+        val bucket = "gpx-runs"
+
+        // Correct call: objectPath, gpxBytes, upsert = false
+        supabaseClient.storage.from(bucket).upload(objectPath, gpxBytes) {
+            upsert = false
+        }
+
+        // Get public URL
+        val publicUrl = supabaseClient.storage.from(bucket).publicUrl(objectPath)
+        return publicUrl
+    }
+
+    suspend fun insertRunToSupabase(
+        supabaseClient: SupabaseClient,
+        userId: String,
+        runStartTimeMillis: Long,
+        distanceKm: Double,
+        durationSec: Long,
+        avgPace: Double,
+        gpxUrl: String
+    ) {
+        val dateString = Instant.ofEpochMilli(runStartTimeMillis).toString()
+
+        val run = Run(
+            user_id = userId,
+            date = dateString,
+            distance_km = distanceKm,
+            duration_secs = durationSec,
+            avg_pace = avgPace,
+            gpx_url = gpxUrl
+        )
+
+        supabaseClient
+            .from("runs")
+            .insert(run)
     }
 
 

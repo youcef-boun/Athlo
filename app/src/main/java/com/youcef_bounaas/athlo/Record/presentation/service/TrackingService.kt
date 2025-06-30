@@ -23,6 +23,7 @@ import com.google.android.gms.location.Priority
 import com.youcef_bounaas.athlo.Record.data.LocationBroadcaster
 import com.youcef_bounaas.athlo.Record.utils.calculateTotalDistanceInKm
 import com.youcef_bounaas.athlo.Record.utils.haversineDistance
+import com.youcef_bounaas.athlo.Stats.data.TrackPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -77,7 +78,9 @@ class TrackingService : Service() {
                 if (last == null || haversineDistance(last, point) > 5.0) {
                     pathPoints.add(point)
                     if (pathPoints.size >= 2) {
-                        totalDistance = calculateTotalDistanceInKm(listOf(pathPoints))
+                        val now = System.currentTimeMillis()
+                        val trackPoints = pathPoints.map { point -> TrackPoint(point, now) }
+                        totalDistance = calculateTotalDistanceInKm(listOf(trackPoints))
                     }
                     LocationBroadcaster.broadcast(point)
                 }

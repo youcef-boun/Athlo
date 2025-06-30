@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -77,6 +78,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.mapbox.maps.extension.style.layers.properties.generated.ProjectionName
 import com.mapbox.maps.extension.style.projection.generated.setProjection
 import com.mapbox.maps.extension.style.projection.generated.Projection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+import org.koin.androidx.compose.get
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -84,6 +92,7 @@ import com.mapbox.maps.extension.style.projection.generated.Projection
 @Composable
 fun RecordScreen() {
     val viewModel: RecordViewModel = getViewModel()
+    val supabaseClient: SupabaseClient = get()
 
     val isRunning by viewModel.isRunning.collectAsState()
     val isFinished by viewModel.isFinished.collectAsState()
@@ -330,6 +339,44 @@ fun RecordScreen() {
                                             viewModel.finishRun()
                                             stopTrackingService(context)
                                             context.stopService(Intent(context, TrackingService::class.java))
+
+                                            val gpxString = viewModel.exportCurrentRunToGpx()
+                                            val userId = supabaseClient.auth.currentUserOrNull()?.id
+                                            if (gpxString != null && userId != null) {
+                                                CoroutineScope(Dispatchers.IO).launch {
+                                                    try {
+                                                        val publicUrl = viewModel.uploadGpxToSupabase(
+                                                            supabaseClient = supabaseClient,
+                                                            gpxString = gpxString,
+                                                            userId = userId
+                                                        )
+                                                        if (publicUrl != null) {
+                                                            Log.d("RecordScreen", "GPX uploaded successfully: $publicUrl")
+                                                            // Insert run metadata into DB
+                                                            try {
+                                                                viewModel.insertRunToSupabase(
+                                                                    supabaseClient = supabaseClient,
+                                                                    userId = userId,
+                                                                    runStartTimeMillis = viewModel.runStartTimeMillis.value ?: System.currentTimeMillis(),
+                                                                    distanceKm = viewModel.distance.value.toDouble(),
+                                                                    durationSec = viewModel.timeInSeconds.value.toLong(),
+                                                                    avgPace = viewModel.avgPace.value.toDoubleOrNull() ?: 0.0,
+                                                                    gpxUrl = publicUrl
+                                                                )
+                                                                Log.d("RecordScreen", "Run metadata inserted into DB!")
+                                                            } catch (e: Exception) {
+                                                                Log.e("RecordScreen", "Error inserting run metadata", e)
+                                                            }
+                                                        } else {
+                                                            Log.e("RecordScreen", "GPX upload failed: publicUrl is null")
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        Log.e("RecordScreen", "Error uploading GPX", e)
+                                                    }
+                                                }
+                                            } else {
+                                                Log.e("RecordScreen", "GPX string or userId is null; not uploading")
+                                            }
                                         }
                                     ) {
                                         Text("Yes")
@@ -579,7 +626,7 @@ fun MapScreen() {
             if (segment.size >= 2) {
                 manager.create(
                     PolylineAnnotationOptions()
-                        .withPoints(segment)
+                        .withPoints(segment.map { it.point })
                         .withLineColor(primaryColor.toArgb().toUInt().toString())
                         .withLineWidth(4.0)
                 )
@@ -605,7 +652,7 @@ fun MapScreen() {
 
     LaunchedEffect(trackingState) {
         if (trackingState == TrackingState.FINISHED) {
-            val allPoints = pathSegments.flatten()
+            val allPoints = pathSegments.flatten().map { it.point }
             if (allPoints.size >= 2) {
                 val bounds = calculateBounds(allPoints)
                 val mapboxMap = mapViewRef?.getMapboxMap() ?: return@LaunchedEffect
