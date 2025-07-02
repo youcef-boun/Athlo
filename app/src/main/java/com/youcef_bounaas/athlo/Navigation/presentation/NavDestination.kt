@@ -14,6 +14,8 @@ sealed class NavDestination(val route: String) {
     data object Maps : NavDestination("maps")
     data object Record : NavDestination("record")
    data object Stats : NavDestination("stats")
+    data object StatsDetails : NavDestination("statsdetails")
+
 
 
 

@@ -11,5 +11,6 @@ data class Run(
     val distance_km: Double,
     val duration_secs: Long,
     val avg_pace: Double,
-    val gpx_url: String
+    val gpx_url: String,
+    val city: String? = null
 )

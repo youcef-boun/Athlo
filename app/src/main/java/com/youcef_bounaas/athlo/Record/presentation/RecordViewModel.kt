@@ -10,7 +10,10 @@ import androidx.lifecycle.AndroidViewModel
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.viewModelScope
+import com.mapbox.api.geocoding.v5.GeocodingCriteria
+import com.mapbox.api.geocoding.v5.MapboxGeocoding
 import com.mapbox.maps.CameraOptions
+import com.youcef_bounaas.athlo.R
 import com.youcef_bounaas.athlo.Record.data.LocationBroadcaster
 import com.youcef_bounaas.athlo.Record.presentation.service.TrackingService
 import com.youcef_bounaas.athlo.Record.utils.calculateTotalDistanceInKm
@@ -28,9 +31,24 @@ import kotlinx.coroutines.launch
 
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.time.Instant
+import kotlin.coroutines.resume
 
+
+fun parsePaceToDouble(pace: String): Double? {
+    if (pace == "-:--" || pace == "--:--" || pace.isBlank()) return null
+    val parts = pace.split(":")
+    return if (parts.size == 2) {
+        val min = parts[0].toIntOrNull() ?: return null
+        val sec = parts[1].toIntOrNull() ?: return null
+        min + (sec / 60.0)
+    } else {
+        pace.toDoubleOrNull()
+    }
+}
 
 enum class TrackingState { IDLE, TRACKING, PAUSED, FINISHED }
 
@@ -40,16 +58,14 @@ class RecordViewModel(
     private val savedStateHandle: androidx.lifecycle.SavedStateHandle
 ) : AndroidViewModel(application) {
 
+    val accessToken = getApplication<Application>().getString(R.string.mapbox_access_token)
+
 
     private val _centerOnUser = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val centerOnUser: SharedFlow<Unit> = _centerOnUser
 
 
-/*
-    private val _pathSegments = MutableStateFlow<List<List<Point>>>(emptyList())
-    val pathSegments: StateFlow<List<List<Point>>> = _pathSegments.asStateFlow()
 
- */
 
     private val _pathSegments = MutableStateFlow<List<List<TrackPoint>>>(emptyList())
     val pathSegments: StateFlow<List<List<TrackPoint>>> = _pathSegments.asStateFlow()
@@ -73,7 +89,7 @@ class RecordViewModel(
     private val _distance = MutableStateFlow(0f)
     val distance = _distance.asStateFlow()
 
-    private val _avgPace = MutableStateFlow("-:--") // static for now
+    private val _avgPace = MutableStateFlow("-:--")
     val avgPace = _avgPace.asStateFlow()
 
     private val _hasZoomedOnStart = MutableStateFlow(savedStateHandle.get<Boolean>(HAS_ZOOMED_ON_START) ?: false)
@@ -346,6 +362,10 @@ class RecordViewModel(
         return String.format("%d:%02d", minutes, seconds)
     }
 
+    fun getStartingPoint(): Point? {
+        return pathSegments.value.firstOrNull()?.firstOrNull()?.point
+    }
+
     fun exportCurrentRunToGpx(): String? {
         val segments = pathSegments.value
         val startMillis = runStartTimeMillis.value
@@ -395,7 +415,8 @@ class RecordViewModel(
         distanceKm: Double,
         durationSec: Long,
         avgPace: Double,
-        gpxUrl: String
+        gpxUrl: String,
+        city: String?
     ) {
         val dateString = Instant.ofEpochMilli(runStartTimeMillis).toString()
 
@@ -405,7 +426,8 @@ class RecordViewModel(
             distance_km = distanceKm,
             duration_secs = durationSec,
             avg_pace = avgPace,
-            gpx_url = gpxUrl
+            gpx_url = gpxUrl,
+            city = city
         )
 
         supabaseClient
@@ -413,5 +435,55 @@ class RecordViewModel(
             .insert(run)
     }
 
+    suspend fun reverseGeocodeStartingPoint(point: Point, accessToken: String): String? =
+        suspendCancellableCoroutine { continuation ->
+            val client = MapboxGeocoding.builder()
+                .accessToken(accessToken)
+                .query(Point.fromLngLat(point.longitude(), point.latitude()))
+                .geocodingTypes(GeocodingCriteria.TYPE_PLACE, GeocodingCriteria.TYPE_REGION, GeocodingCriteria.TYPE_COUNTRY)
+                .build()
+            client.enqueueCall(object : retrofit2.Callback<com.mapbox.api.geocoding.v5.models.GeocodingResponse> {
+                override fun onResponse(
+                    call: retrofit2.Call<com.mapbox.api.geocoding.v5.models.GeocodingResponse>,
+                    response: retrofit2.Response<com.mapbox.api.geocoding.v5.models.GeocodingResponse>
+                ) {
+                    val features = response.body()?.features()
+                    val place = features?.firstOrNull()
+                    // Compose city, state, country (if available)
+                    val city = place?.context()?.find { it.id()?.startsWith("place") == true }?.text()
+                        ?: place?.text()
+                    val state = place?.context()?.find { it.id()?.startsWith("region") == true }?.text()
+                    val country = place?.context()?.find { it.id()?.startsWith("country") == true }?.text()
+                    val result = listOfNotNull(city, state, country).joinToString(", ")
+                    continuation.resume(if (result.isNotEmpty()) result else null)
+                }
 
+                override fun onFailure(
+                    call: retrofit2.Call<com.mapbox.api.geocoding.v5.models.GeocodingResponse>,
+                    t: Throwable
+                ) {
+                    continuation.resume(null)
+                }
+            })
         }
+
+
+
+    suspend fun fetchRunsFromSupabase(supabaseClient: SupabaseClient, userId: String): List<Run> {
+        return supabaseClient.from("runs")
+            .select {
+                filter {
+                    eq("user_id", userId)
+                }
+                order("date", Order.DESCENDING)
+            }
+            .decodeList<Run>()
+    }
+
+
+
+
+
+
+
+}

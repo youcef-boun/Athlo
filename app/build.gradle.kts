@@ -85,6 +85,10 @@ dependencies {
 
 
 
+    implementation("com.mapbox.mapboxsdk:mapbox-sdk-services:6.12.0")
+
+
+
 
 
 

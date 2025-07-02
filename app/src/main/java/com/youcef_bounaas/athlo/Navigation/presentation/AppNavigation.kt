@@ -19,6 +19,7 @@ import com.youcef_bounaas.athlo.Home.presentation.UserInfoScreen
 import com.youcef_bounaas.athlo.Maps.presentation.MapsScreen
 import com.youcef_bounaas.athlo.Record.presentation.RecordScreen
 import com.youcef_bounaas.athlo.Record.presentation.StatsScreen
+import com.youcef_bounaas.athlo.Stats.presentation.StatsDetailsScreen
 import io.github.jan.supabase.SupabaseClient
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
@@ -40,7 +41,8 @@ fun AppNavigation(
                 currentRoute != NavDestination.SignUp.route && 
                 currentRoute != NavDestination.Login.route &&
                 currentRoute != NavDestination.UserInfo.route &&
-                currentRoute != NavDestination.ConfirmEmail.route
+                currentRoute != NavDestination.ConfirmEmail.route &&
+                currentRoute != NavDestination.StatsDetails.route
                 )
                        {
                 NavigationBar {
@@ -106,6 +108,10 @@ fun AppNavigation(
 
             composable(NavDestination.Stats.route) {
                 StatsScreen()
+            }
+
+            composable(NavDestination.StatsDetails.route) {
+                StatsDetailsScreen()
             }
         }
     }

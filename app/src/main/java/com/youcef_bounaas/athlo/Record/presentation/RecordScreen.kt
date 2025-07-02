@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.mapbox.maps.extension.style.layers.properties.generated.ProjectionName
 import com.mapbox.maps.extension.style.projection.generated.setProjection
 import com.mapbox.maps.extension.style.projection.generated.Projection
+import com.youcef_bounaas.athlo.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -353,17 +354,26 @@ fun RecordScreen() {
                                                         if (publicUrl != null) {
                                                             Log.d("RecordScreen", "GPX uploaded successfully: $publicUrl")
                                                             // Insert run metadata into DB
+                                                            val startingPoint = viewModel.getStartingPoint()
+                                                            val accessToken = context.getString(R.string.mapbox_access_token)
+                                                            val locationString = if (startingPoint != null) {
+                                                                viewModel.reverseGeocodeStartingPoint(startingPoint, accessToken)
+                                                            } else null
                                                             try {
+                                                                val avgPaceValue = parsePaceToDouble(viewModel.avgPace.value) ?: 0.0
                                                                 viewModel.insertRunToSupabase(
                                                                     supabaseClient = supabaseClient,
                                                                     userId = userId,
                                                                     runStartTimeMillis = viewModel.runStartTimeMillis.value ?: System.currentTimeMillis(),
                                                                     distanceKm = viewModel.distance.value.toDouble(),
                                                                     durationSec = viewModel.timeInSeconds.value.toLong(),
-                                                                    avgPace = viewModel.avgPace.value.toDoubleOrNull() ?: 0.0,
-                                                                    gpxUrl = publicUrl
+                                                                    avgPace = avgPaceValue,
+                                                                    gpxUrl = publicUrl,
+                                                                    city = locationString
+
                                                                 )
                                                                 Log.d("RecordScreen", "Run metadata inserted into DB!")
+                                                                Log.d("RecordScreen", "Resolved location: $locationString")
                                                             } catch (e: Exception) {
                                                                 Log.e("RecordScreen", "Error inserting run metadata", e)
                                                             }
@@ -419,6 +429,8 @@ fun RecordScreen() {
         }
     }
 }
+
+
 
 @Composable
 private fun MapControlButton(
@@ -493,7 +505,7 @@ fun MapScreen() {
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryColor = Color(0xFF55F78A)
 
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var lineManager by remember { mutableStateOf<PolylineAnnotationManager?>(null) }
@@ -597,6 +609,13 @@ fun MapScreen() {
             mapViewRef = it
         }
     )
+
+
+
+
+
+
+
 
     LaunchedEffect(mapViewRef) {
         mapViewRef?.getMapboxMap()?.addOnCameraChangeListener {
