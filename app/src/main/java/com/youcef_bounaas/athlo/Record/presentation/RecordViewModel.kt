@@ -420,6 +420,7 @@ class RecordViewModel(
     ) {
         val dateString = Instant.ofEpochMilli(runStartTimeMillis).toString()
 
+
         val run = Run(
             user_id = userId,
             date = dateString,

@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Run(
+    val id: String? = null,
     val user_id: String,
     val date: String,
     val distance_km: Double,

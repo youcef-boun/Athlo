@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import com.youcef_bounaas.athlo.Authentication.di.AuthModule
 import com.youcef_bounaas.athlo.Authentication.di.SupabaseModule
+import com.youcef_bounaas.athlo.di.aiModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -20,8 +21,8 @@ class MainApplication : Application() {
             modules(
                 appModule,
                 SupabaseModule,
-                AuthModule
-
+                AuthModule,
+                aiModule
             )
         }
     }

@@ -124,8 +124,8 @@ class MainActivity : ComponentActivity() {
                         AppNavigation(
                             navController = navController,
                             startDestination =
-                             //   startDestination,
-                            NavDestination.StatsDetails.route,
+                               startDestination,
+                           // NavDestination.StatsDetails.route,
                             onSignOut = {
                                 isUserAuthenticated = false
                                 // Clear the back stack and navigate to Auth screen

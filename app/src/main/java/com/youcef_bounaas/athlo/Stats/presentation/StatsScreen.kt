@@ -3,9 +3,11 @@
 package com.youcef_bounaas.athlo.Record.presentation
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.youcef_bounaas.athlo.Stats.data.Run
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -41,7 +44,7 @@ import kotlin.math.roundToInt
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
-fun StatsScreen() {
+fun StatsScreen(navController: NavController) {
     val supabaseClient: SupabaseClient = get()
     val viewModel: RecordViewModel = getViewModel()
     val userId = supabaseClient.auth.currentUserOrNull()?.id
@@ -137,7 +140,30 @@ fun StatsScreen() {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(runs) { run ->
-                        PopularSpotItemFromRun(run, gpxCache)
+                        PopularSpotItemFromRun(
+
+                            run = run,
+                            gpxCache = gpxCache,
+                            onClick = {
+                                try {
+                                    Log.d("StatsScreen", "[DEBUG] Preparing to navigate to run details for id: ${run.id}")
+                                    Log.d("StatsScreen", "[DEBUG] Run object: $run")
+                                    Log.d("StatsScreen", "[DEBUG] Navigation controller: ${navController.currentBackStackEntry?.destination?.route}")
+                                    
+                                    val route = "statsdetails/${run.id}"
+                                    Log.d("StatsScreen", "[DEBUG] Attempting navigation to route: $route")
+                                    
+                                    navController.navigate(route) {
+                                        Log.d("StatsScreen", "[DEBUG] Navigation options configured")
+                                    }
+                                    
+                                    Log.d("StatsScreen", "[DEBUG] Navigation command sent for run id: ${run.id}")
+                                } catch (e: Exception) {
+                                    Log.e("StatsScreen", "[ERROR] Navigation failed for run id: ${run.id}", e)
+                                    throw e // Re-throw to see the crash in Logcat
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -167,7 +193,11 @@ fun parseGpxLatLngs(input: InputStream): List<LatLng> {
 }
 
 @Composable
-fun PopularSpotItemFromRun(run: Run, gpxCache: MutableMap<String, List<LatLng>>) {
+fun PopularSpotItemFromRun(
+    run: Run,
+    gpxCache: MutableMap<String, List<LatLng>>,
+    onClick: () -> Unit
+) {
     var trackPoints by remember(run.gpx_url) { mutableStateOf<List<LatLng>?>(null) }
     var loading by remember(run.gpx_url) { mutableStateOf(false) }
 
@@ -194,7 +224,8 @@ fun PopularSpotItemFromRun(run: Run, gpxCache: MutableMap<String, List<LatLng>>)
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+        .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),

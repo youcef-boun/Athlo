@@ -7,9 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.navArgument
 import com.youcef_bounaas.athlo.Authentication.presentation.AuthScreen
 import com.youcef_bounaas.athlo.Authentication.presentation.ConfirmEmailScreen
 import com.youcef_bounaas.athlo.Authentication.presentation.LoginScreen
@@ -107,12 +109,23 @@ fun AppNavigation(
             }
 
             composable(NavDestination.Stats.route) {
-                StatsScreen()
+                StatsScreen(navController)
             }
 
-            composable(NavDestination.StatsDetails.route) {
-                StatsDetailsScreen()
+            composable(
+                route = "${NavDestination.StatsDetails.route}/{runId}",
+                arguments = listOf(navArgument("runId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId")
+                StatsDetailsScreen(
+                    runId = runId,
+                    onBackClick = { navController.popBackStack() }
+
+                )
             }
+
+
+
         }
     }
 }

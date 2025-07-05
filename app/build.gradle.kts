@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.play.services.location)
+    implementation(libs.androidx.datastore.core.android)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -79,13 +80,34 @@ dependencies {
 
 
     // MAPBOX
-     implementation("com.mapbox.maps:android:11.10.3")
+    implementation("com.mapbox.maps:android:11.10.3")
     implementation("com.mapbox.extension:maps-compose:11.10.3")
     implementation("com.mapbox.plugin:maps-locationcomponent:11.10.3")
 
 
 
     implementation("com.mapbox.mapboxsdk:mapbox-sdk-services:6.12.0")
+
+    // Kotlin Coroutines & Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
+    
+    // Ktor for HTTP requests
+    val ktorVersion = "2.3.2"  // Reverted to original version
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-client-logging:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")   // Use OkHttp engine instead of CIO
+    implementation("io.ktor:ktor-client-auth:$ktorVersion")     // For authentication
+    implementation("io.ktor:ktor-client-encoding:$ktorVersion") // For response compression
+    
+    // Ktor plugins
+    implementation("io.ktor:ktor-client-plugins:$ktorVersion") {
+        exclude(group = "io.ktor", module = "ktor-client-core")
+    }
+
 
 
 
@@ -136,6 +158,10 @@ dependencies {
     implementation ("androidx.constraintlayout:constraintlayout-compose:1.0.1")
     implementation ("androidx.compose.material3:material3-window-size-class:1.1.0")
 
+    // Koin for dependency injection
+    implementation("io.insert-koin:koin-android:3.4.3")
+    implementation("io.insert-koin:koin-androidx-compose:3.4.6")
+    
     // type safe navigation
     implementation ("androidx.navigation:navigation-compose:2.7.7")
 
@@ -160,11 +186,13 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:realtime-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
 
-
     // Ktor for Supabase (version 3.0.0-rc-1 as required)
     implementation("io.ktor:ktor-client-okhttp:3.0.0-rc-1")
     implementation("io.ktor:ktor-client-content-negotiation:3.0.0-rc-1")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0-rc-1")
+
+    // Mapbox Compose SDK dependencies
+
 
     // Google Play Services
     implementation("com.google.android.gms:play-services-location:21.0.1")
@@ -175,7 +203,10 @@ dependencies {
     implementation ("androidx.core:core-ktx:1.13.0")
 
 
+  // Open Ai
 
+   // implementation("com.aallam.openai:openai-client:4.0.1")
+    implementation("com.aallam.openai:openai-client:4.0.1") // Removed as per request to switch to Together AI
 
 
 

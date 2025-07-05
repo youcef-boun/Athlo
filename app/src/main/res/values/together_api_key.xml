@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="together_api_key" translatable="false" tools:ignore="UnusedResources">d93fd29a999c4bb0849de703f5ca73d0f1d46394e802b232708a0b76588f9443</string>
+</resources>
