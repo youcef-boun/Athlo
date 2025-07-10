@@ -19,7 +19,7 @@ class UserInfoViewModel(
         viewModelScope.launch {
             _insertResult.value = repository.insertUserProfile(
                 first, last, birthday, gender,
-                avatar_url = TODO()
+                avatar_url = ""
             )
         }
     }

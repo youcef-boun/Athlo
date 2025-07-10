@@ -8,6 +8,6 @@ class ApiKeyManager(
     private val context: Context
 ) : KoinComponent {
     
-    val apiKey: String
-        get() = context.getString(R.string.open_ai_api_key)
+  //  val apiKey: String
+        //get() = context.getString(R.string.open_ai_api_key)
 }

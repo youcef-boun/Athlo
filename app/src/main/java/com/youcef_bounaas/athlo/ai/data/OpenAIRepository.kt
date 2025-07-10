@@ -10,7 +10,6 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.websocket.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.LogLevel
@@ -19,11 +18,9 @@ import io.ktor.client.plugins.observer.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 
 @Serializable
 data class TogetherAIMessage(
@@ -139,7 +136,7 @@ class OpenAIRepositoryImpl(
                 - Location: ${run.city ?: "Unknown location"}
                 - Date and time of run: ${run.date}
                 
-                Write a 3-5 sentence friendly, encouraging insight about this run. Focus on the positive aspects of the run and provide motivational feedback.
+                Write a 3 sentence friendly, encouraging insight about this run. Focus on the positive aspects of the run and provide motivational feedback.
                 """.trimIndent()
 
             Log.d("OpenAIRepository", "Making Together AI API request...")

@@ -175,7 +175,7 @@ fun StatsDetailsScreen(
 
     // Get the current insight state
     val insightState by viewModel.insightState.collectAsState()
-
+    
     // For map and GPX
     var gpxPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
     val scope = rememberCoroutineScope()
@@ -211,7 +211,7 @@ fun StatsDetailsScreen(
                 Log.d("StatsDetailsScreen", "Fetched profile for userId: ${fetchedRun.user_id}")
 
                 Log.d("StatsDetailScreen", "[DEBUG] Run object set: ${fetchedRun.id}")
-
+                
                 // Parse GPX if available
                 fetchedRun.gpx_url?.let { gpxUrl ->
                     Log.d("StatsDetailScreen", "[DEBUG] Parsing GPX from URL: $gpxUrl")
@@ -499,7 +499,7 @@ fun StatsDetailsScreen(
                         Box(
                             modifier = Modifier.width(40.dp)
                         )
-
+                        
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -565,98 +565,98 @@ fun StatsDetailsScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // AI Insight Section
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "AI Insights",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = textColor
-                                )
-
-                                IconButton(
-                                    onClick = {
-                                        if (run != null && profile != null) {
-                                            viewModel.generateInsight(run!!, profile!!)
-                                        }
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Refresh insight",
-                                        tint = MaterialTheme.colorScheme.primary
+                            // AI Insight Section
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            when (val state = insightState) {
-                                is InsightState.Loading -> {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator()
-                                    }
-                                }
-
-                                is InsightState.Success -> {
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        text = state.insight,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        text = "AI Insights",
+                                        style = MaterialTheme.typography.titleMedium,
                                         color = textColor
                                     )
-                                }
-
-                                is InsightState.Error -> {
-                                    Column {
-                                        Text(
-                                            text = "Couldn't generate insights: ${state.message}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Button(
-                                            onClick = {
-                                                if (run != null && profile != null) {
-                                                    viewModel.generateInsight(run!!, profile!!)
-                                                }
+                                    
+                                    IconButton(
+                                        onClick = {
+                                            if (run != null && profile != null) {
+                                                viewModel.generateInsight(run!!, profile!!)
                                             }
-                                        ) {
-                                            Text("Try Again")
-                                        }
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Refresh insight",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
                                     }
                                 }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                when (val state = insightState) {
+                                    is InsightState.Loading -> {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator()
+                                        }
+                                    }
 
-                                is InsightState.Idle -> {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
+                                    is InsightState.Success -> {
                                         Text(
+                                            text = state.insight,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = textColor
+                                        )
+                                    }
+
+                                    is InsightState.Error -> {
+                                        Column {
+                                            Text(
+                                                text = "Couldn't generate insights: ${state.message}",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Button(
+                                                onClick = {
+                                                    if (run != null && profile != null) {
+                                                        viewModel.generateInsight(run!!, profile!!)
+                                                    }
+                                                }
+                                            ) {
+                                                Text("Try Again")
+                                            }
+                                        }
+                                    }
+
+                                    is InsightState.Idle -> {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
                                             text = "Click below to generate AI insights about your run!",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = secondaryTextColor,
                                             modifier = Modifier.padding(bottom = 8.dp)
-                                        )
+                                            )
                                         Button(
-                                            onClick = {
+                                                onClick = {
                                                 if (run != null && profile != null) {
                                                     viewModel.generateInsight(run!!, profile!!)
                                                 }
@@ -675,7 +675,7 @@ fun StatsDetailsScreen(
     }
 
 
-}
+    }
 
 @Composable
 fun StatItemCentered(

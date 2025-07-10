@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.DataThresholding
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.Warehouse
@@ -15,11 +16,6 @@ sealed class BottomNavItem(
     val title: String,
     val icon: ImageVector
 ) {
-    data object Home : BottomNavItem(
-        route = NavDestination.Home.route,
-        title = "Home",
-        icon = Icons.Default.Warehouse
-    )
 
     data object Maps : BottomNavItem(
         route = NavDestination.Maps.route,
@@ -38,7 +34,15 @@ sealed class BottomNavItem(
         icon = Icons.Default.DataThresholding
     )
 
+    data object Home : BottomNavItem(
+        route = NavDestination.Home.route,
+        title = "You",
+        icon = Icons.Default.PersonPin
+    )
+
+
+
     companion object {
-        fun getAllItems() = listOf(Home, Maps, Record, Stats)
+        fun getAllItems() = listOf(Maps, Record, Stats, Home)
     }
 }

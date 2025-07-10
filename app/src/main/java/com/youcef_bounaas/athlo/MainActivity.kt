@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         val startDestination = if (isUserAuthenticated) {
-                            NavDestination.Home.route
+                            NavDestination.Maps.route
                         } else {
                             NavDestination.Auth.route
                         }
