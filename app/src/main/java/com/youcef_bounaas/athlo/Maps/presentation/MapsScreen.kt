@@ -76,6 +76,12 @@ import com.mapbox.maps.plugin.gestures.removeOnMapClickListener
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun MapsScreen() {
+    // DEBUG: Show which screen is rendered
+    androidx.compose.material3.Text(
+        text = "MAPS SCREEN",
+        color = androidx.compose.ui.graphics.Color.Red,
+        modifier = androidx.compose.ui.Modifier.padding(16.dp)
+    )
     val viewModel: RecordViewModel = getViewModel()
     val mapsViewModel: MapsViewModel = getViewModel()
     val trackingState by viewModel.trackingState.collectAsState()
