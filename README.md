@@ -71,7 +71,7 @@ Athlo is a modern, AI-powered Android app designed to help you track, analyze, a
    git clone https://github.com/youcef-boun/Athlo
    ```
 2. **Open in Android Studio.**
-3. ** Enter your own keys 
+3. **Enter your own keys 
 4. **Sync Gradle and run on an emulator or device.**
 
 ---
